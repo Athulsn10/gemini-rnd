@@ -17,7 +17,8 @@ const getSearchResult = async (req, res) => {
                 "contents": ["item1","item2"],
             }
 
-        If the image contain a photo of a person, try to identify the person, respond in the same format
+        If the image contain a photo of a person, try to identify the person, respond in the same format.
+        If its a pdf file summerize the overall contents in it, respond in the same format as the rest.
        `; 
      
       
