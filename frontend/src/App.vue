@@ -1,181 +1,230 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { LoadingOutlined, PlusOutlined } from '@ant-design/icons-vue';
+import {
+  PlusOutlined,
+  SearchOutlined,
+  FileTextOutlined,
+  CloudUploadOutlined,
+} from "@ant-design/icons-vue";
 import { getAnalysis } from "./service/http";
+import Table from "./components/Table.vue";
 
-const apiResponse = ref(null)
+interface FileItem {
+  uid: string;
+  name: string;
+  size: number;
+  type: string;
+  originFileObj: File;
+  contents?: string[];
+}
+
+const apiResponse = ref<FileItem[]>([]);
 const open = ref<boolean>(false);
-const previewVisible = ref(false);
-const previewImage = ref('');
-const previewTitle = ref('');
-const fileList = ref<any>([]);
+const fileList = ref<FileItem[]>([]);
 const loading = ref(false);
+const searchTerm = ref("");
 
 const showModal = () => {
   open.value = !open.value;
 };
 
-const handleOk = (e: MouseEvent) => {
-  console.log(e);
-  open.value = false;
-};
-
-const handleSubmit = async() => {
-  loading.value = true;
-  if (!fileList.value[0].originFileObj) {
-    alert('No image uploaded');
-    loading.value = false;
+const handleSubmit = async () => {
+  if (!fileList.value.length) {
+    alert("No file uploaded");
     return;
   }
-  const response = await getAnalysis(fileList.value[0].originFileObj);
-  if ( response ) {
-    apiResponse.value = response.data.contents;
-    open.value = false;
-    loading.value = false;
-  }
-};
 
-const handleCancel = () => {
-  previewVisible.value = false;
-  previewTitle.value = '';
+  loading.value = true;
+  const currentFile = fileList.value[0];
+
+  try {
+    const response = await getAnalysis(currentFile.originFileObj);
+
+    if (response) {
+      currentFile.contents = response.data.contents;
+
+      const existingFileIndex = apiResponse.value.findIndex(
+        (f) => f.uid === currentFile.uid
+      );
+      if (existingFileIndex === -1) {
+        apiResponse.value.push(currentFile);
+      } else {
+        apiResponse.value[existingFileIndex] = currentFile;
+      }
+    }
+  } catch (error) {
+    console.error("Analysis failed", error);
+  } finally {
+    fileList.value = [];
+    loading.value = false;
+    open.value = false;
+  }
 };
 
 const handleModalClose = () => {
-  open.value = false
+  open.value = false;
+  fileList.value = [];
 };
-
-const  getBase64 = (file: File) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = error => reject(error);
-  });
-};
-
-const handlePreview = async (file: any) => {
-  if (!file.url && !file.preview) {
-    file.preview = (await getBase64(file.originFileObj)) as string;
-  }
-  previewImage.value = file.url || file.preview;
-  previewVisible.value = true;
-  previewTitle.value = file.name || file.url.substring(file.url.lastIndexOf('/') + 1);
-};
-
 </script>
 
 <template>
-  <div class="container">
-    <div class="layout-wrapper">
-      <div class="modal-section">
-        <a-button type="primary" @click="showModal" class="mb-4">Open Modal</a-button>
-        <a-modal 
-          v-model:open="open" 
-          title="Upload Modal" 
-          @ok="handleOk" 
-        >
-          <div class="clearfix">
-            <a-upload
-              v-model:file-list="fileList"
-              list-type="picture-card"
-              @preview="handlePreview"
-            >
-              <div v-if="fileList.length < 8">
-                <plus-outlined />
-                <div style="margin-top: 8px">Upload</div>
-              </div>
-            </a-upload>
-            <a-modal
-              :open="previewVisible"
-              :title="previewTitle"
-              :footer="null"
-              @cancel="handleCancel"
-            >
-              <img alt="example" style="width: 100%" :src="previewImage" />
-            </a-modal>
-          </div>
-          <template #footer>
-            <a-button key="back" @click="handleModalClose">Cancel</a-button>
-            <a-button key="submit" type="primary" :loading="loading" @click="handleSubmit">Submit</a-button>
-          </template>
-        </a-modal>
-      </div>
-      
-      <div class="response-section">
-        <div class="response-container">
-          <div v-if="loading">
-            <LoadingOutlined />
-          </div>
-         <div v-else>
-            <div v-if="apiResponse" class="api-response">
-              <ul v-for="item in apiResponse" :key="item">
-                <li>{{item}}</li>
-              </ul>
+  <div class="file-upload-container">
+    <div
+      class="upload-section"
+      style="
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        padding: 24px;">
+      <a-button
+        type="primary"
+        @click="showModal"
+        style="
+          background-color: #4a90e2;
+          border: none;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 20px;
+          font-weight: 600;
+          border-radius: 8px;
+          transition: all 0.3s ease;"
+        class="upload-btn">
+        <cloud-upload-outlined />
+        Upload File
+      </a-button>
+
+      <a-modal
+        v-model:open="open"
+        title="Upload File"
+        :footer="null"
+        centered
+        style="max-width: 500px">
+        <div
+          class="upload-modal-content"
+          style="
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;">
+          <a-upload
+            v-model:file-list="fileList"
+            list-type="picture-card"
+            :max-count="1"
+            style="margin-bottom: 16px;">
+            <div
+              style="
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                color: #8c8c8c;">
+              <plus-outlined style="font-size: 24px" />
+              <div style="margin-top: 8px; font-size: 14px">Upload</div>
             </div>
-            <div v-else class="placeholder">
-             Upload a file to view response
-            </div>
-         </div>
+          </a-upload>
+
+          <div
+            class="modal-actions"
+            style="
+              display: flex;
+              justify-content: center;
+              gap: 12px;
+              width: 100%;">
+            <a-button
+              @click="handleModalClose"
+              style="border: 1px solid #d9d9d9; border-radius: 8px">
+              Cancel
+            </a-button>
+            <a-button
+              type="primary"
+              :loading="loading"
+              :disabled="!fileList.length"
+              @click="handleSubmit"
+              style="
+                background-color: #4a90e2;
+                border: none;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                gap: 8px;">
+              <file-text-outlined v-if="!loading" />
+              {{ loading ? "Processing..." : "Submit" }}
+            </a-button>
+          </div>
         </div>
+      </a-modal>
+    </div>
+
+    <div
+      class="response-section"
+      style="
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+        padding: 24px;">
+      <div
+        class="search-container"
+        style="margin-bottom: 20px; position: relative">
+        <a-input-search
+          v-model:value="searchTerm"
+          placeholder="Search files or contents"
+          style="
+            width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
+          <template #prefix>
+            <search-outlined style="color: #8c8c8c" />
+          </template>
+        </a-input-search>
+      </div>
+      <div
+        class="response-container"
+        style="
+          border: 1px solid #e8e8e8;
+          border-radius: 12px;
+          padding: 20px;
+          min-height: 300px;
+          background-color: #f9f9f9;">
+        <div
+          v-if="loading"
+          style="
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;">
+          <img src="/ai-loading.gif" height="60px" alt="Loading" />
+        </div>
+        <Table :files="apiResponse" :search-term="searchTerm" />
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.layout-wrapper {
+.file-upload-container {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  height: 100vh;
+  gap: 24px;
+  margin: 0 auto;
+  padding: 24px;
+  background-color: #f4f6f9;
+  min-height: 100vh;
 }
 
 @media (min-width: 768px) {
-  .layout-wrapper {
+  .file-upload-container {
     flex-direction: row;
   }
-}
 
-.modal-section {
-  width: 100%;
-  padding: 20px;
-  background-color: #f0f2f5;
-}
-
-@media (min-width: 768px) {
-  .modal-section {
-    width: 50%;
-    overflow-y: auto;
-  }
-}
-
-.response-section {
-  width: 100%;
-  padding: 20px;
-  background-color: #ffffff;
-}
-
-@media (min-width: 768px) {
+  .upload-section,
   .response-section {
     width: 50%;
-    overflow-y: auto;
   }
 }
 
-.response-container {
-  border: 1px solid #d9d9d9;
-  border-radius: 8px;
-  padding: 20px;
-  min-height: 300px;
-}
-
-.placeholder {
-  color: #8c8c8c;
-  text-align: center;
-  padding: 20px;
-}
-
-.api-response {
-  word-wrap: break-word;
+.upload-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);
 }
 </style>
