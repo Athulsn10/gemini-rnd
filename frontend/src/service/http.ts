@@ -14,5 +14,6 @@ export const getAnalysis = async (file: any) => {
         return response;
     } catch (error) {
         console.error('API error:', error);
+        return false;
     }
 };
